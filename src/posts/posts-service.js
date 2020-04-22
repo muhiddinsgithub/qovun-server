@@ -9,7 +9,8 @@ const PostsService = {
     return db
       .from('posts')
       .select('*')
-      .where('user_id', user_id);
+      .where('user_id', user_id)
+      .orderBy('date_created', 'desc');
   },
   insertPost(knex, newPost) {
     return knex
@@ -32,7 +33,9 @@ const PostsService = {
   updatePost(knex, id, newPostFields) {
     return knex('posts')
       .where({ 'post_id': id  })
-      .update(newPostFields);
+      .update(newPostFields)
+      .returning('*');
+      
   },
 };
 

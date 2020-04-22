@@ -135,7 +135,7 @@ postsRouter
       postToUpdate
     )
       .then((post) => {
-        res.json(post);
+        res.json(post[0]);
       })
       .catch(next);
   });
