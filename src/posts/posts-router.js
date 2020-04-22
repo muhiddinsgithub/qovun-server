@@ -2,14 +2,14 @@ const path = require('path');
 const express = require('express');
 const xss = require('xss');
 const PostsService = require('./posts-service');
-const requireAuth = require('../middleware/jwt-auth');
+const { requireAuth } = require('../middleware/jwt-auth');
 
 
 const postsRouter = express.Router();
-const postTypesRouter = express.Router();
+const postRouter = express.Router();
 const jsonParser = express.json();
 
-postTypesRouter
+postsRouter
   .route('/sections')
   .get((req, res, next) => {           
     const knexInstance = req.app.get('db');
@@ -20,16 +20,9 @@ postTypesRouter
       .catch(next);
   });
 
-const serializePost = post => ({
-  id: post.post_id,
-  userId: post.user_id,
-  title: xss(post.title),
-  content: xss(post.content),
-  date_created: post.date_created,
-});
 
 postsRouter
-  .route('/allposts')
+  .route('/')
   .get((req, res, next) => {           
     const knexInstance = req.app.get('db');
     PostsService.getAllPosts(knexInstance)
@@ -37,10 +30,14 @@ postsRouter
         res.json(posts.map(serializePost));
       })
       .catch(next);
-  })
-  .post(jsonParser, requireAuth.requireAuth, (req, res, next) => {   // TODO: add requireAuth() middleware
-    const { title, content, userId } = req.body;
-    const newPost = { title, content, userId };
+  });
+
+postsRouter
+  .route('/addpost')
+  .post(jsonParser, requireAuth, (req, res, next) => { 
+    const { title, content, section } = req.body;
+    const { user_id } = req.user;
+    const newPost = { user_id, title, content, section };
 
     for (const [key, value] of Object.entries(newPost))
       if (value === null)
@@ -48,18 +45,43 @@ postsRouter
           error: { message: `Missing '${key}' in request body` }
         });
 
-    PostsService.insertArticle(
+    PostsService.insertPost(
       req.app.get('db'),
       newPost
     )
       .then(post => {
         res
           .status(201)
-          .location(path.posix.join(req.originalUrl, `/${post.id}`))
+          .location(path.posix.join(req.originalUrl, `/${post.post_id}`))
           .json(serializePost(post));
       })
       .catch(next);
   });
+
+postRouter
+  .route('/myposts') 
+  .all(requireAuth, (req, res, next) => {
+    const { user_id } = req.user;
+    PostsService.getPostsForUser(
+      req.app.get('db'),
+      user_id
+    )
+      .then(posts => {
+        if (!posts) {
+          return res.status(404).json({
+            // eslint-disable-next-line quotes
+            error: { message: `Posts don't exist` }
+          });
+        }
+        res.posts = posts;
+        next();
+      })
+      .catch(next);
+  })
+  .get((req, res) => {
+    res.json(res.posts);
+  });
+ 
 
 postsRouter
   .route('/:post_id')
@@ -80,24 +102,25 @@ postsRouter
       })
       .catch(next);
   })
-  .get((req, res, next) => {
+  .get((req, res) => {
     res.json(serializePost(res.post));
   })
-  .delete((req, res, next) => {
+  .delete(requireAuth, (req, res, next) => {
     PostsService.deletePost(
       req.app.get('db'),
       req.params.post_id
     )
-      .then(numRowsAffected => {
+      .then(() => {
         res.status(204).end();
       })
       .catch(next);
   })
-  .patch(jsonParser, (req, res, next) => {
-    const { title, content, userId } = req.body;
-    const articleToUpdate = { title, content, userId };
+  .patch(requireAuth, jsonParser, (req, res, next) => {
+    const { title, content, section} = req.body; 
+    const { user_id } = req.user; 
+    const postToUpdate = { title, content, section, user_id};
 
-    const numberOfValues = Object.values(articleToUpdate).filter(Boolean).length;
+    const numberOfValues = Object.values(postToUpdate).filter(Boolean).length;
     if (numberOfValues === 0)
       return res.status(400).json({
         error: {
@@ -109,14 +132,23 @@ postsRouter
     PostsService.updatePost(
       req.app.get('db'),
       req.params.post_id,
-      articleToUpdate
+      postToUpdate
     )
-      .then(numRowsAffected => {
-        res.status(204).end();
+      .then((post) => {
+        res.json(post);
       })
       .catch(next);
   });
 
-module.exports = { postsRouter, postTypesRouter };
+const serializePost = post => ({
+  post_id: post.post_id,
+  section: post.section,
+  user_id: post.user_id,
+  title: xss(post.title),
+  content: xss(post.content),
+  date_created: post.date_created,
+});
+
+module.exports = { postsRouter, postRouter };
 
 

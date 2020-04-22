@@ -3,28 +3,35 @@ const PostsService = {
     return knex.select('section').from('posts').distinct();
   },
   getAllPosts(knex) {
-    return knex.select('*').from('posts');
+    return knex.select('*').from('posts').orderBy('date_created', 'desc');
+  },
+  getPostsForUser(db, user_id) {
+    return db
+      .from('posts')
+      .select('*')
+      .where('user_id', user_id);
   },
   insertPost(knex, newPost) {
     return knex
       .insert(newPost)
       .into('posts')
       .returning('*')
-      .then(rows => {
-        return rows[0]
-      });
+      .then(([post]) => post)
+      .then(post => 
+        PostsService.getById(knex, post.post_id)
+      );
   },
   getById(knex, id) {
-    return knex.from('posts').select('*').where('id', id).first();
+    return knex.from('posts').select('*').where('post_id', id).first();
   },
   deletePost(knex, id) {
     return knex('posts')
-      .where({ id })
+      .where({ 'post_id': id })
       .delete();
   },
   updatePost(knex, id, newPostFields) {
     return knex('posts')
-      .where({ id })
+      .where({ 'post_id': id  })
       .update(newPostFields);
   },
 };

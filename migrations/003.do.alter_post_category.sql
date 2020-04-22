@@ -1,8 +1,9 @@
 CREATE TYPE post_category AS ENUM ( 
+  'Other',
   'Jobs',
   'Apartments',
   'Cars',
-  'Other'
+  'Events'
 );                  
 
 ALTER TABLE posts

@@ -1,6 +1,9 @@
+const { requireAuth } = require('../middleware/jwt-auth');
+
 const express = require('express');
 const path = require('path');
 const UsersService = require('./users-service');
+
 
 const usersRouter = express.Router();
 const jsonBodyParser = express.json();
@@ -50,12 +53,23 @@ usersRouter
               .then(user => {
                 res
                   .status(201)
-                  .location(path.posix.join(req.originalUrl, `/${user.id}`))
+                  .location(path.posix.join(req.originalUrl, `/${user.user_id}`))
                   .json(UsersService.serializeUser(user));
               });
           });
       })
       .catch(next);
   });
+
+usersRouter
+  .get('/name', requireAuth, (req, res, next) => {
+    const { full_name } = req.user;
+    res.json({ full_name });
+  })
+  .get('/user_id', requireAuth, (req, res, next) => {
+    const { user_id } = req.user;
+    res.json({ user_id });
+  });
+  
 
 module.exports = usersRouter;
